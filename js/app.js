@@ -1,4 +1,9 @@
+/*
+/ SETUP FUNCTIONS THESE ARE NECESSARY
+*/
+
 async function setup() {
+    // define where to look for the RNBO export
     const patchExportURL = "export/patch.export.json";
 
     // Create AudioContext
@@ -9,8 +14,14 @@ async function setup() {
     const outputNode = context.createGain();
     outputNode.connect(context.destination);
     
-    // Fetch the exported patcher
+    /*
+    / Fetch the exported patcher!!!
+    */
+
+    // define variables "response" and "patcher"
     let response, patcher;
+
+    // try to fetch the RNBO patch
     try {
         response = await fetch(patchExportURL);
         patcher = await response.json();
@@ -114,6 +125,13 @@ function loadRNBOScript(version) {
     });
 }
 
+/* 
+/ END SETUP FUNCTIONS 
+/
+/ BEGIN OTHER SHIT>>>
+*/
+
+// make the sliders on the tutorial page
 function makeSliders(device) {
     let pdiv = document.getElementById("rnbo-parameter-sliders");
     let noParamLabel = document.getElementById("no-param-label");
@@ -208,6 +226,7 @@ function makeSliders(device) {
     });
 }
 
+// make the inports section of the website
 function makeInportForm(device) {
     const idiv = document.getElementById("rnbo-inports");
     const inportSelect = document.getElementById("inport-select");
@@ -247,6 +266,7 @@ function makeInportForm(device) {
     }
 }
 
+// make the outports section of the website
 function attachOutports(device) {
     const outports = device.outports;
     if (outports.length < 1) {
@@ -267,6 +287,7 @@ function attachOutports(device) {
     });
 }
 
+// load any presets
 function loadPresets(device, patcher) {
     let presets = patcher.presets || [];
     if (presets.length < 1) {
@@ -285,6 +306,7 @@ function loadPresets(device, patcher) {
     presetSelect.onchange = () => device.setPreset(presets[presetSelect.value].preset);
 }
 
+// make the MIDI keyboard portion
 function makeMIDIKeyboard(device) {
     let mdiv = document.getElementById("rnbo-clickable-keyboard");
     if (device.numMIDIInputPorts === 0) return;
@@ -335,5 +357,10 @@ function makeMIDIKeyboard(device) {
         mdiv.appendChild(key);
     });
 }
+
+/* 
+/                           Actually run all this shit
+/   \\/\\/\\/\\/\\/\\/\\/\\/\\/\\/\\//\//\//\//\//\//\//\//\//\//\//\//\//\//
+*/
 
 setup();
