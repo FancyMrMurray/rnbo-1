@@ -386,11 +386,33 @@ function updateGamepadControls() {
 
     const gp = gamepads[0];
 
+    //buttons
     if (gp.buttons[0].pressed) {
-
+        button_a = 1;
+    } else {
+        button_a = 0;
     }
+    if (gp.buttons[1].pressed) {
+        button_b = 1;
+    } else {
+        button_b = 0;
+    }
+/*    if (gp.buttons[2].pressed) {
+        button_x = 1;
+    } else {
+        button_x = 0;
+    }
+    if (gp.buttons[3].pressed) {
+        button_y = 1;
+    } else {
+        button_y = 0;
+    }*/
 
-
+    //axis
+    axis_left_x = gp.axes[0];
+    axis_left_x = gp.axes[0];
+    axis_left_x = gp.axes[0];
+    axis_left_x = gp.axes[0];
 }
 
 
