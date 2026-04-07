@@ -2,6 +2,9 @@
 / SETUP FUNCTIONS THESE ARE NECESSARY
 */
 
+//define the device variable in the global scope so we can access its parameters in a different function
+let device;
+
 async function setup() {
     // define where to look for the RNBO export
     const patchExportURL = "export/patch.export.json";
@@ -63,7 +66,7 @@ async function setup() {
     } catch (e) {}
 
     // Create the device
-    let device;
+    
     try {
         device = await RNBO.createDevice({ context, patcher });
     } catch (err) {
@@ -100,6 +103,8 @@ async function setup() {
     // (Optional) Connect MIDI inputs
     makeMIDIKeyboard(device);
 
+    updateParams();
+
     document.body.onclick = () => {
         context.resume();
     }
@@ -128,7 +133,7 @@ function loadRNBOScript(version) {
 /* 
 / END SETUP FUNCTIONS 
 /
-/ BEGIN OTHER SHIT>>>
+/ BEGIN OTHER STUFF>>>
 */
 
 // make the sliders on the tutorial page
@@ -359,61 +364,96 @@ function makeMIDIKeyboard(device) {
 }
 
 /* 
-/ Gamepad connecting functionality
+/ Gamepad connecting/disconnecting functionality
 */
 
-let axis_left_y, axis_right_y, axis_left_x, axis_right_x;
-let button_a, button_b;
+let controlScheme = "keyboard";
 
-//add a log for connection
+// add actions for gamepad connection
 window.addEventListener("gamepadconnected", (e) => {
 
     const gp = navigator.getGamepads()[e.gamepad.index];
-    console.log(`Gamepad connected at index ${gp.index}: ${gp.id}. It has ${gp.buttons.length} buttons and ${gp.axes.length} axes.`);
 
-    //fire game loop once controller is connected
-    updateGamepadControls();
+    // update control scheme and fire game loop once controller is connected
+    controlScheme = "gamepad";
+    console.log(`Gamepad connected at index ${gp.index}: ${gp.id}. It has ${gp.buttons.length} buttons and ${gp.axes.length} axes.`);
 
 });
 
-function updateGamepadControls() {
+//add actions for gamepad disconnection
+window.addEventListener("gamepaddisconnected", (e) => {
 
-    const gamepads = navigator.getGamepads();
+    //fall back to keyboard control scheme
+    controlScheme = "keyboard";
+    console.log("Gamepad disconnected!");
 
-    if (!gamepads) {
+})
+
+/*
+/   Updating parameters in the RNBO patch
+/
+/   Instead of mapping gamepad/keyboard to variables, we will assign the RNBO params to variables.
+/   By looking at the controlScheme variable to see where to update from (each animation frame).
+*/
+
+function updateParams() {
+
+    if (controlScheme == null) {
+        console.error("!!controlScheme = null!!")
         return;
     }
 
-    const gp = gamepads[0];
+    //get the parameters
+    const paramDistance = device.parametersById.get("distance");
+    const paramFilterBump = device.parametersById.get("filter-bump");
+    const paramAmpBump = device.parametersById.get("amp-bump");
+    const paramPitchWobble = device.parametersById.get("pitch-wobble");
 
-    //buttons
-    if (gp.buttons[0].pressed) {
-        button_a = 1;
-    } else {
-        button_a = 0;
-    }
-    if (gp.buttons[1].pressed) {
-        button_b = 1;
-    } else {
-        button_b = 0;
-    }
-/*    if (gp.buttons[2].pressed) {
-        button_x = 1;
-    } else {
-        button_x = 0;
-    }
-    if (gp.buttons[3].pressed) {
-        button_y = 1;
-    } else {
-        button_y = 0;
-    }*/
+    if (controlScheme = "gamepad") {
+        //get the gamepad and map its buttons/triggers/thumbsticks so we don't have to update each statement
+        const gp = navigator.getGamepads()[0];
+        const button_a = gp.buttons[0];
+        const button_b = gp.buttons[1];
+        const button_x = gp.buttons[2];
+        const button_y = gp.buttons[3];
+        const dpad_up = gp.buttons[12];
+        const dpad_down = gp.buttons[13];
+        const dpad_left = gp.buttons[14];
+        const dpad_right = gp.buttons[15];
+        const axis_left_y = gp.axes[1];
+        const axis_left_x = gp.axes[0];
+        const axis_right_y = gp.axes[3];
+        const axis_right_x = gp.axes[2];
+        const left_bumper = gp.buttons[4];
+        const right_bumper = gp.buttons[5];
+        const left_trigger = gp.buttons[6];
+        const right_trigger = gp.buttons[7];
 
-    //axis
-    axis_left_x = gp.axes[0];
-    axis_left_x = gp.axes[0];
-    axis_left_x = gp.axes[0];
-    axis_left_x = gp.axes[0];
+        //update parameters from gamepad buttons
+        if (button_a.pressed) {
+            paramFilterBump = 1;
+        } else {
+            paramFilterBump = 0;
+        }
+        if (button_b.pressed) {
+            paramAmpBump = 1;
+        } else {
+            paramAmpBump = 0;
+        }
+        
+        //calculate pitch wobble
+        let pitchWobble = Math.abs(axis_left_y) + Math.abs(axis_left_x) + Math.abs(axis_right_y) + Math.abs(axis_right_x);
+        paramPitchWobble = pitchWobble;
+
+        //distance - think about this
+
+    }
+    
+    
+
 }
+
+
 
 
 /* 
@@ -424,4 +464,5 @@ function updateGamepadControls() {
 setup();
 
 //the game loop is fired as an event listener to connecting a gamepad - there will also be a hit start button for keyboards and mice
-//gameLoop();
+//updateParameters();
+//WAIT - UPDATE PARAMS WILL BE CALLED INSIDE OF SETUP - THAT WAY IT WILL REMAIN ASYNCHORNOUSE TO LOADING TIMES
