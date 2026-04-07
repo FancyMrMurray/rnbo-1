@@ -359,8 +359,47 @@ function makeMIDIKeyboard(device) {
 }
 
 /* 
+/ Gamepad connecting functionality
+*/
+
+let axis_left_y, axis_right_y, axis_left_x, axis_right_x;
+let button_a, button_b;
+
+//add a log for connection
+window.addEventListener("gamepadconnected", (e) => {
+
+    const gp = navigator.getGamepads()[e.gamepad.index];
+    console.log(`Gamepad connected at index ${gp.index}: ${gp.id}. It has ${gp.buttons.length} buttons and ${gp.axes.length} axes.`);
+
+    //fire game loop once controller is connected
+    updateGamepadControls();
+
+});
+
+function updateGamepadControls() {
+
+    const gamepads = navigator.getGamepads();
+
+    if (!gamepads) {
+        return;
+    }
+
+    const gp = gamepads[0];
+
+    if (gp.buttons[0].pressed) {
+
+    }
+
+
+}
+
+
+/* 
 /                           Actually run all this shit
 /   \\/\\/\\/\\/\\/\\/\\/\\/\\/\\/\\//\//\//\//\//\//\//\//\//\//\//\//\//\//
 */
 
 setup();
+
+//the game loop is fired as an event listener to connecting a gamepad - there will also be a hit start button for keyboards and mice
+//gameLoop();
