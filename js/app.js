@@ -5,6 +5,12 @@
 //define the device variable in the global scope so we can access its parameters in a different function
 let device;
 
+//set all of our RNBO params HERE
+let paramAmpBump;
+let paramFiltBump;
+let paramDistance;
+let paramPitchWobble;
+
 async function setup() {
     // define where to look for the RNBO export
     const patchExportURL = "export/patch.export.json";
@@ -112,6 +118,12 @@ async function setup() {
     // Skip if you're not using guardrails.js
     if (typeof guardrails === "function")
         guardrails();
+
+    paramAmpBump = device.parametersById.get("amp-bump");
+    paramFiltBump = device.parametersById.get("filter-bump");
+    paramDistance = device.parametersById.get("distance");
+    paramPitchWobble = device.parametersById.get("pitch-wobble");
+
 }
 
 function loadRNBOScript(version) {
@@ -364,95 +376,146 @@ function makeMIDIKeyboard(device) {
 }
 
 /* 
+/ END RNBO TEMPLATE
+/
+/ Begin my shit >>>
+*/
+
+// a clamp function for all the clamping
+function clamp(num, lower, upper) {
+    return Math.min(Math.max(num, lower), upper);
+}
+
+function scale(input, inLow, inHigh, outLow, outHigh) {
+    return (input - inLow) * (outHigh - outLow) / (inHigh - inLow) + outLow;
+}
+
+/* 
 / Gamepad connecting/disconnecting functionality
 */
 
-let controlScheme = "keyboard";
-
 // add actions for gamepad connection
 window.addEventListener("gamepadconnected", (e) => {
-
     const gp = navigator.getGamepads()[e.gamepad.index];
-
-    // update control scheme and fire game loop once controller is connected
-    controlScheme = "gamepad";
     console.log(`Gamepad connected at index ${gp.index}: ${gp.id}. It has ${gp.buttons.length} buttons and ${gp.axes.length} axes.`);
 
+    //updateParams() will be called only when a gamepad is connected
+    updateParams();
 });
 
 //add actions for gamepad disconnection
 window.addEventListener("gamepaddisconnected", (e) => {
-
-    //fall back to keyboard control scheme
-    controlScheme = "keyboard";
     console.log("Gamepad disconnected!");
+});
 
-})
-
-/*
-/   Updating parameters in the RNBO patch
-/
-/   Instead of mapping gamepad/keyboard to variables, we will assign the RNBO params to variables.
-/   By looking at the controlScheme variable to see where to update from (each animation frame).
+/*  Updating parameters in the RNBO patch
+/   
+/   so keyboard input is event driven, so it happens outside the update params loop,
+/   but gamepad is polled continuously, so it happens inside the loop
+/   so the updateParams() loop is really just a gamepad only thing
 */
 
+
+// make an inputState variable that stores all the key values, mouseX and Y, and a list that has gamepad input on it
+const inputState = {
+
+    keys: new Set(),
+    mouseX: 0,
+    mouseY: 0,
+    prevGamepad: { buttons: [], axes: [] },
+
+};
+
+// create a distance variable
+let distance = 0;
+
+// set up listeners for keyboard input (broadly)
+// this first one adds a pressed key to the list
+window.addEventListener('keydown', (e) => {
+    if (!inputState.keys.has(e.code)) {
+        inputState.keys.add(e.code);
+        //increment distance on add
+        distance += 0.001;
+    }
+});
+
+// this second one removes a key when it is unpressed
+window.addEventListener('keyup', (e) => {
+    inputState.keys.delete(e.code);
+    //increment distance
+    distance += 0.001; 
+});
+
+// this third one gets the absolute value of a mouse movement, checks that it wasn't zero, and then does stuff with that
+window.addEventListener('mousemove', (e) => {
+    const dx = Math.abs(e.movementX);
+    const dy = Math.abs(e.movementY);
+    //update distance
+    if (dx > 0 || dy > 0) {
+        distance += 0.0001;
+    }
+    //update pitch-wobble
+    const wobble = scale(clamp((dx+dy), 0, 100), 0, 50, 0.001, 2)
+    console.log("wobble: ${wobble}");
+
+});
+
+
+
+//variable for looping updateParams
+let start;
+
+//now we run this every frame - gamepad must be polled per-frame (unlike keyboard/mouse which are event-driven)
 function updateParams() {
 
-    if (controlScheme == null) {
-        console.error("!!controlScheme = null!!")
-        return;
-    }
-
-    //get the parameters
-    const paramDistance = device.parametersById.get("distance");
-    const paramFilterBump = device.parametersById.get("filter-bump");
-    const paramAmpBump = device.parametersById.get("amp-bump");
-    const paramPitchWobble = device.parametersById.get("pitch-wobble");
-
-    if (controlScheme = "gamepad") {
-        //get the gamepad and map its buttons/triggers/thumbsticks so we don't have to update each statement
-        const gp = navigator.getGamepads()[0];
-        const button_a = gp.buttons[0];
-        const button_b = gp.buttons[1];
-        const button_x = gp.buttons[2];
-        const button_y = gp.buttons[3];
-        const dpad_up = gp.buttons[12];
-        const dpad_down = gp.buttons[13];
-        const dpad_left = gp.buttons[14];
-        const dpad_right = gp.buttons[15];
-        const axis_left_y = gp.axes[1];
-        const axis_left_x = gp.axes[0];
-        const axis_right_y = gp.axes[3];
-        const axis_right_x = gp.axes[2];
-        const left_bumper = gp.buttons[4];
-        const right_bumper = gp.buttons[5];
-        const left_trigger = gp.buttons[6];
-        const right_trigger = gp.buttons[7];
-
-        //update parameters from gamepad buttons
-        if (button_a.pressed) {
-            paramFilterBump = 1;
-        } else {
-            paramFilterBump = 0;
-        }
-        if (button_b.pressed) {
-            paramAmpBump = 1;
-        } else {
-            paramAmpBump = 0;
-        }
+    // get gamepad(s)
+    const gamepads = navigator.getGamepads();
+    for (const gp of gamepads) {
         
-        //calculate pitch wobble
-        let pitchWobble = Math.abs(axis_left_y) + Math.abs(axis_left_x) + Math.abs(axis_right_y) + Math.abs(axis_right_x);
-        paramPitchWobble = pitchWobble;
+        if (!gp) continue; //this will skip any null values (docs say that first item will always be null?)
 
-        //distance - think about this
+        // Check buttons 
+        gp.buttons.forEach((button, i) => {
+            //the first time all the values will be null and it will fill in 0 values for everything
+            const prev = inputState.prevGamepad.buttons[i] ?? 0;
+            //if we are greater than our previous value by at least 0.01 (which with 0s and 1s we always will be if we just hit the buton)
+            if (Math.abs(button.value - prev) > 0.01) {
+                //increment distance
+                distance += 0.001;
+            }
+            //now that we did our check, update the input state for the next frame
+            inputState.prevGamepad.buttons[i] = btn.value;
+        });
 
+        // Check axes (thumbsticks)
+        gp.axes.forEach((axis, i) => {
+            //the first time they'll be null... so zero...
+            const prev = inputState.prevGamepad.axes[i] ?? 0;
+            //if we are greater than our previous by at least 0.01 (which with thumbsticks is now a proper threshhold)...
+            if (Math.abs(axis - prev) > 0.01) {
+                //increment distance
+                distance += 0.001;
+            }
+            //after check, update for next frame
+            inputState.prevGamepad.axes[i] = axis;
+        });
+    };
+
+    //a note --- now that prevGamepad has been updated it's not really prev anymore...
+
+    //filter bump
+    if (gp.buttons[0].pressed) {
+        
     }
-    
-    
 
+    //amp bump
+
+    //distance update
+
+
+    //do it all again...
+    start = requestAnimationFrame(updateParams);
 }
-
 
 
 
@@ -463,6 +526,4 @@ function updateParams() {
 
 setup();
 
-//the game loop is fired as an event listener to connecting a gamepad - there will also be a hit start button for keyboards and mice
-//updateParameters();
-//WAIT - UPDATE PARAMS WILL BE CALLED INSIDE OF SETUP - THAT WAY IT WILL REMAIN ASYNCHORNOUSE TO LOADING TIMES
+console.log(device);
